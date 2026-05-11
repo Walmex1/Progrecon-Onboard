@@ -1,0 +1,37 @@
+# Adatbázis
+backend/progrecon.db
+backend/*.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# Virtuális környezet
+venv/
+.venv/
+env/
+
+# Log fájlok
+*.log
+
+# Környezeti változók
+.env
+*.env
+
+# Nagy forrásadatok
+iranyitoszam.xlsx
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

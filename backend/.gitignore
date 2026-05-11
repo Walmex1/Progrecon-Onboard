@@ -1,0 +1,19 @@
+# Adatbázis
+progrecon.db
+*.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtuális környezet
+venv/
+.venv/
+env/
+
+# Log fájlok
+*.log
+
+# Környezeti változók
+.env

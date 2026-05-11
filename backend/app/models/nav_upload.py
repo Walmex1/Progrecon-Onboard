@@ -1,0 +1,13 @@
+from datetime import datetime, timezone
+from sqlalchemy import Integer, String, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
+from app.database import Base
+
+class NavUpload(Base):
+    __tablename__ = "nav_uploads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entry_record_id: Mapped[int] = mapped_column(Integer, ForeignKey("entry_records.id"), nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    file_path: Mapped[str] = mapped_column(String, nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
