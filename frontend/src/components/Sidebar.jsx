@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../store/auth.jsx";
 
@@ -31,66 +32,187 @@ const ADMIN_MENU = [
   { label: "Adminisztráció", children: [
     { label: "Felhasználók", to: "/admin/felhasznalok" },
     { label: "Költséghelyek", to: "/admin/koltseghelyek" },
+    { label: "Régió", to: "/admin/regio" },
     { label: "Munkavállalói adatbázis", to: "/admin/munkavallalok" },
     { label: "Napló / Log", to: "/admin/naplo" },
   ]},
 ];
 
-export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+const ROLE_LABEL = {
+  pv: "Projektvezető",
+  berszamfejto: "Bérszámfejtő",
+  admin: "Admin",
+};
 
-  function handleLogout() {
-    logout();
-    navigate("/login");
-  }
+const DEFAULT_OPEN_SECTIONS = [
+  ...PV_MENU,
+  ...BERSZAMFEJTO_MENU,
+  ...ADMIN_MENU,
+].reduce((acc, section) => {
+  acc[section.label] = false;
+  return acc;
+}, {});
+
+export default function Sidebar() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [openSections, setOpenSections] = useState(DEFAULT_OPEN_SECTIONS);
 
   let menu = [];
   if (user?.role === "pv") menu = PV_MENU;
   if (user?.role === "berszamfejto") menu = BERSZAMFEJTO_MENU;
   if (user?.role === "admin") menu = [...PV_MENU, ...BERSZAMFEJTO_MENU, ...ADMIN_MENU];
 
+  const roleLabel = ROLE_LABEL[user?.role] || user?.role || "";
+  const footerName = user?.person
+    ? `${user.person.first_name} ${user.person.last_name}`
+    : roleLabel;
+  const initial = footerName.charAt(0).toUpperCase();
+
+  const toggleSection = (label) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  };
+
   return (
     <aside style={styles.sidebar}>
-      <div style={styles.logo} onClick={() => navigate("/")} role="button">
-        Progrecon Onboard
+      <div style={styles.logoSection} onClick={() => navigate("/")} role="button">
+        <span style={styles.logoText}>Progrecon Onboard</span>
       </div>
+      <div style={styles.divider} />
       <nav style={styles.nav}>
         {menu.map((section) => (
           <div key={section.label} style={styles.section}>
-            <div style={styles.sectionTitle}>{section.label}</div>
-            {section.children.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                style={({ isActive }) => ({
-                  ...styles.link,
-                  ...(isActive ? styles.linkActive : {}),
-                })}
-              >
-                {item.label}
-              </NavLink>
-            ))}
+            <div
+              style={styles.sectionTitle}
+              onClick={() => toggleSection(section.label)}
+            >
+              <span>{section.label}</span>
+              <span>{openSections[section.label] ? "▼" : "▶"}</span>
+            </div>
+            {openSections[section.label] &&
+              section.children.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  style={({ isActive }) => ({
+                    ...styles.link,
+                    ...(isActive ? styles.linkActive : {}),
+                  })}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
           </div>
         ))}
       </nav>
+      <div style={styles.divider} />
       <div style={styles.footer}>
-        <span style={styles.username}>{user?.role}</span>
-        <button style={styles.logoutBtn} onClick={handleLogout}>Kilépés</button>
+        <div style={styles.avatar}>{initial}</div>
+        <div style={styles.footerInfo}>
+          <div style={styles.footerName}>{footerName}</div>
+          <div style={styles.footerRole}>{user?.role}</div>
+        </div>
       </div>
     </aside>
   );
 }
 
 const styles = {
-  sidebar: { width: "240px", minHeight: "100vh", background: "#2c3e50", color: "#ecf0f1", display: "flex", flexDirection: "column", flexShrink: 0 },
-  logo: { padding: "1.2rem 1rem", fontWeight: 600, fontSize: "1rem", borderBottom: "1px solid #3d5166", cursor: "pointer", userSelect: "none" },
-  nav: { flex: 1, overflowY: "auto", padding: "0.5rem 0" },
-  section: { marginBottom: "0.5rem" },
-  sectionTitle: { padding: "0.6rem 1rem 0.3rem", fontSize: "0.75rem", textTransform: "uppercase", color: "#95a5a6", letterSpacing: "0.05em" },
-  link: { display: "block", padding: "0.45rem 1rem 0.45rem 1.4rem", fontSize: "0.9rem", color: "#bdc3c7", textDecoration: "none" },
-  linkActive: { color: "#fff", background: "#3d5166", borderLeft: "3px solid #3498db" },
-  footer: { padding: "1rem", borderTop: "1px solid #3d5166", display: "flex", justifyContent: "space-between", alignItems: "center" },
-  username: { fontSize: "0.85rem", color: "#95a5a6" },
-  logoutBtn: { background: "none", border: "1px solid #7f8c8d", color: "#bdc3c7", padding: "4px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "0.8rem" },
+  sidebar: {
+    width: "232px",
+    minHeight: "100vh",
+    background: "#1e2330",
+    display: "flex",
+    flexDirection: "column",
+    flexShrink: 0,
+  },
+  logoSection: {
+    padding: "18px 16px",
+    cursor: "pointer",
+    userSelect: "none",
+  },
+  logoText: {
+    fontSize: "13px",
+    fontWeight: 500,
+    color: "#fff",
+    letterSpacing: "0.01em",
+  },
+  divider: {
+    height: "0.5px",
+    background: "rgba(255,255,255,0.08)",
+    margin: "0",
+  },
+  nav: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "8px 0",
+  },
+  section: {
+    marginBottom: "4px",
+  },
+  sectionTitle: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10px 16px 4px",
+    fontSize: "10px",
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.35)",
+    letterSpacing: "0.8px",
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  link: {
+    display: "block",
+    padding: "7px 16px 7px 20px",
+    fontSize: "12.5px",
+    color: "rgba(255,255,255,0.6)",
+    textDecoration: "none",
+    borderRadius: "0",
+    transition: "background 0.1s",
+  },
+  linkActive: {
+    background: "rgba(255,255,255,0.1)",
+    color: "#fff",
+  },
+  footer: {
+    padding: "14px 16px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  avatar: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "50%",
+    background: "#534AB7",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "12px",
+    fontWeight: 500,
+    flexShrink: 0,
+  },
+  footerInfo: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1px",
+    minWidth: 0,
+  },
+  footerName: {
+    fontSize: "12.5px",
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: 500,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  footerRole: {
+    fontSize: "11px",
+    color: "rgba(255,255,255,0.35)",
+  },
 };

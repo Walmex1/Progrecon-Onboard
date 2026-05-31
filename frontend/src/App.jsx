@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./store/auth.jsx";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
@@ -9,10 +11,20 @@ import Payroll from "./pages/Payroll";
 import AdminCostCenters from "./pages/AdminCostCenters";
 import AdminUsers from "./pages/AdminUsers";
 import AdminEmployees from "./pages/AdminEmployees";
+import AdminRegions from "./pages/AdminRegions";
 
 export default function App() {
   return (
     <AuthProvider>
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss
+        pauseOnHover
+      />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -28,6 +40,7 @@ export default function App() {
             <Route path="/admin/koltseghelyek" element={<AdminCostCenters />} />
             <Route path="/admin/felhasznalok" element={<AdminUsers />} />
             <Route path="/admin/munkavallalok" element={<AdminEmployees />} />
+            <Route path="/admin/regio" element={<AdminRegions />} />
           </Route>
         </Routes>
       </BrowserRouter>

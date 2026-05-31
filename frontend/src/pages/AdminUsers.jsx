@@ -1,13 +1,23 @@
 import { useEffect, useState } from "react";
 import client from "../api/client";
 
+function validateEmail(v) {
+  if (!v) return null;
+  if (v.length > 254) return "Az e-mail cím maximum 254 karakter lehet";
+  if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(v)) {
+    return "Érvénytelen e-mail cím (pl. nev@domain.hu)";
+  }
+  return null;
+}
+
 const ROLE_LABELS = { pv: "PV", berszamfejto: "Bérszámfejtő", admin: "Admin" };
 
-const EMPTY_CREATE = { username: "", password: "", role: "pv", cost_center_ids: [] };
-const EMPTY_EDIT = { role: "pv", cost_center_ids: [] };
+const EMPTY_CREATE = { username: "", role: "pv", region: "", person_last_name: "", person_first_name: "", person_email: "" };
+const EMPTY_EDIT = { username: "", role: "pv", region: "", person_last_name: "", person_first_name: "", person_email: "" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -15,9 +25,11 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(EMPTY_CREATE);
   const [formError, setFormError] = useState(null);
+  const [emailError, setEmailError] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  const [costCenters, setCostCenters] = useState([]);
+  const [sortField, setSortField] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
+  const [search, setSearch] = useState("");
 
   async function fetchUsers() {
     setLoading(true);
@@ -32,55 +44,58 @@ export default function AdminUsers() {
     }
   }
 
-  async function fetchCostCenters() {
-    try {
-      const res = await client.get("/admin/cost-centers/", { params: { active_only: true } });
-      setCostCenters(res.data);
-    } catch {
-      setCostCenters([]);
-    }
-  }
-
   useEffect(() => {
     const timer = window.setTimeout(() => {
       fetchUsers();
-      fetchCostCenters();
     }, 0);
+    client.get("/admin/cost-centers/").then(res => setCostCenters(res.data));
     return () => window.clearTimeout(timer);
   }, []);
 
   function openCreate() {
     setForm(EMPTY_CREATE);
     setFormError(null);
+    setEmailError(null);
     setModalMode("create");
   }
 
   function openEdit(user) {
     setEditingUser(user);
     setForm({
-      ...EMPTY_EDIT,
+      username: user.username,
       role: user.role,
-      cost_center_ids: user.cost_centers.map((cc) => cc.id),
+      region: user.region ?? "",
+      person_last_name: user.person?.last_name ?? "",
+      person_first_name: user.person?.first_name ?? "",
+      person_email: user.person?.email ?? "",
     });
     setFormError(null);
+    setEmailError(null);
     setModalMode("edit");
   }
 
   function closeModal() {
     setModalMode(null);
     setEditingUser(null);
+    setEmailError(null);
   }
 
   async function handleCreate(e) {
     e.preventDefault();
     setFormError(null);
     setSaving(true);
+    const emailErr = validateEmail(form.person_email.trim());
+    if (emailErr) { setEmailError(emailErr); setSaving(false); return; }
+    setEmailError(null);
     try {
+      const personFilled = form.person_last_name.trim() || form.person_first_name.trim() || form.person_email.trim();
       const payload = {
         username: form.username,
-        password: form.password,
         role: form.role,
-        cost_center_ids: form.role === "pv" ? form.cost_center_ids : [],
+        region: form.role === "pv" ? form.region || null : null,
+        person: personFilled
+          ? { last_name: form.person_last_name.trim(), first_name: form.person_first_name.trim(), email: form.person_email.trim() }
+          : null,
       };
       await client.post("/admin/users/", payload);
       closeModal();
@@ -96,10 +111,17 @@ export default function AdminUsers() {
     e.preventDefault();
     setFormError(null);
     setSaving(true);
+    const emailErr = validateEmail(form.person_email.trim());
+    if (emailErr) { setEmailError(emailErr); setSaving(false); return; }
+    setEmailError(null);
     try {
       const payload = {
+        username: form.username,
         role: form.role,
-        cost_center_ids: form.role === "pv" ? form.cost_center_ids : [],
+        region: form.role === "pv" ? form.region || null : null,
+        person: (form.person_last_name.trim() || form.person_first_name.trim() || form.person_email.trim())
+          ? { last_name: form.person_last_name.trim(), first_name: form.person_first_name.trim(), email: form.person_email.trim() }
+          : null,
       };
       await client.patch(`/admin/users/${editingUser.id}`, payload);
       closeModal();
@@ -115,8 +137,8 @@ export default function AdminUsers() {
     try {
       await client.post(`/admin/users/${id}/deactivate`);
       fetchUsers();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba a deaktiválás során");
+    } catch {
+      // interceptor kezeli
     }
   }
 
@@ -124,27 +146,79 @@ export default function AdminUsers() {
     try {
       await client.post(`/admin/users/${id}/activate`);
       fetchUsers();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba az aktiválás során");
+    } catch {
+      // interceptor kezeli
     }
   }
 
   async function handleDelete(id) {
-    if (!window.confirm("Biztosan véglegesen törlöd ezt a felhasználót?")) return;
+    if (!window.confirm("Biztosan véglegesen törlöd ezt a felhasználót? A személy adatai (név, email) megmaradnak.")) return;
     try {
       await client.delete(`/admin/users/${id}`);
       fetchUsers();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba a törlés során");
+    } catch {
+      // interceptor kezeli
     }
   }
 
-  const showCostCenter = form.role === "pv";
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedUsers = [...users].sort((a, b) => {
+    if (!sortField) return 0;
+    let aVal = "";
+    let bVal = "";
+    if (sortField === "username") {
+      aVal = a.username ?? "";
+      bVal = b.username ?? "";
+    } else if (sortField === "last_name") {
+      aVal = a.person?.last_name ?? "";
+      bVal = b.person?.last_name ?? "";
+    } else if (sortField === "first_name") {
+      aVal = a.person?.first_name ?? "";
+      bVal = b.person?.first_name ?? "";
+    } else if (sortField === "role") {
+      aVal = ROLE_LABELS[a.role] ?? a.role ?? "";
+      bVal = ROLE_LABELS[b.role] ?? b.role ?? "";
+    } else if (sortField === "region") {
+      aVal = a.region ?? "";
+      bVal = b.region ?? "";
+    }
+    aVal = aVal.toString().toLowerCase();
+    bVal = bVal.toString().toLowerCase();
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const filteredUsers = sortedUsers.filter((u) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    const lastName = (u.person?.last_name ?? "").toLowerCase();
+    const firstName = (u.person?.first_name ?? "").toLowerCase();
+    const full = `${lastName} ${firstName}`;
+    const fullReverse = `${firstName} ${lastName}`;
+    return lastName.includes(q) || firstName.includes(q) || full.includes(q) || fullReverse.includes(q);
+  });
+
+  const showRegion = form.role === "pv";
 
   return (
     <div style={styles.card}>
       <div style={styles.header}>
         <h1 style={styles.title}>Felhasználók</h1>
+        <input
+          style={{ ...styles.input, maxWidth: "260px" }}
+          placeholder="Keresés vezetéknév, keresztnév..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <button style={styles.btnPrimary} onClick={openCreate}>
           + Új felhasználó
         </button>
@@ -158,30 +232,41 @@ export default function AdminUsers() {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Felhasználónév</th>
-              <th style={styles.th}>Szerepkör</th>
-              <th style={styles.th}>Költséghely</th>
+              {[
+                { field: "username", label: "Felhasználónév" },
+                { field: "last_name", label: "Vezetéknév" },
+                { field: "first_name", label: "Keresztnév" },
+                { field: "role", label: "Szerepkör" },
+                { field: "region", label: "Régió" },
+              ].map(({ field, label }) => (
+                <th
+                  key={field}
+                  style={{ ...styles.th, cursor: "pointer", userSelect: "none" }}
+                  onClick={() => handleSort(field)}
+                >
+                  {label}
+                  {sortField === field ? (sortDir === "asc" ? " ▲" : " ▼") : " ↕"}
+                </th>
+              ))}
               <th style={styles.th}>Státusz</th>
               <th style={styles.th}>Műveletek</th>
             </tr>
           </thead>
           <tbody>
-            {users.length === 0 && (
+            {filteredUsers.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ ...styles.td, color: "#999", textAlign: "center" }}>
-                  Nincs rögzített felhasználó
+                <td colSpan={7} style={{ ...styles.td, color: "#999", textAlign: "center" }}>
+                  {search.trim() ? "Nincs találat" : "Nincs rögzített felhasználó"}
                 </td>
               </tr>
             )}
-            {users.map((u) => (
+            {filteredUsers.map((u) => (
               <tr key={u.id} style={styles.tr}>
                 <td style={styles.td}>{u.username}</td>
+                <td style={styles.td}>{u.person?.last_name ?? "—"}</td>
+                <td style={styles.td}>{u.person?.first_name ?? "—"}</td>
                 <td style={styles.td}>{ROLE_LABELS[u.role] ?? u.role}</td>
-                <td style={styles.td}>
-                  {u.role === "pv" && u.cost_centers.length > 0
-                    ? u.cost_centers.map((cc) => `${cc.code}`).join(", ")
-                    : "—"}
-                </td>
+                <td style={styles.td}>{u.role === "pv" ? (u.region ?? "—") : "—"}</td>
                 <td style={styles.td}>
                   <span style={u.is_active ? styles.badgeActive : styles.badgeInactive}>
                     {u.is_active ? "Aktív" : "Inaktív"}
@@ -205,12 +290,14 @@ export default function AdminUsers() {
                       <button style={styles.btnSuccess} onClick={() => handleActivate(u.id)}>
                         Aktiválás
                       </button>
-                      <button
-                        style={{ ...styles.btnDanger, marginLeft: "0.5rem" }}
-                        onClick={() => handleDelete(u.id)}
-                      >
-                        Végleges törlés
-                      </button>
+                      {u.role !== "admin" && (
+                        <button
+                          style={{ ...styles.btnDanger, marginLeft: "0.5rem" }}
+                          onClick={() => handleDelete(u.id)}
+                        >
+                          Végleges törlés
+                        </button>
+                      )}
                     </>
                   )}
                 </td>
@@ -240,14 +327,76 @@ export default function AdminUsers() {
                     />
                   </div>
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Jelszó</label>
+                    <label style={styles.label}>Vezetéknév <span style={{ color: "#999", fontWeight: 400 }}>(opcionális)</span></label>
                     <input
-                      type="password"
                       style={styles.input}
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      required
+                      value={form.person_last_name}
+                      onChange={(e) => setForm({ ...form, person_last_name: e.target.value })}
                     />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Keresztnév <span style={{ color: "#999", fontWeight: 400 }}>(opcionális)</span></label>
+                    <input
+                      style={styles.input}
+                      value={form.person_first_name}
+                      onChange={(e) => setForm({ ...form, person_first_name: e.target.value })}
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Email <span style={{ color: "#999", fontWeight: 400 }}>(opcionális)</span></label>
+                    <input
+                      type="text"
+                      style={styles.input}
+                      value={form.person_email}
+                      onChange={(e) => setForm({ ...form, person_email: e.target.value })}
+                      onBlur={() => setEmailError(validateEmail(form.person_email.trim()))}
+                    />
+                    {emailError && (
+                      <div style={{ fontSize: "0.8rem", color: "#e65100", marginTop: "4px" }}>{emailError}</div>
+                    )}
+                  </div>
+                </>
+              )}
+              {modalMode === "edit" && (
+                <>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Felhasználónév</label>
+                    <input
+                      style={styles.input}
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Vezetéknév</label>
+                    <input
+                      style={styles.input}
+                      value={form.person_last_name}
+                      onChange={(e) => setForm({ ...form, person_last_name: e.target.value })}
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Keresztnév</label>
+                    <input
+                      style={styles.input}
+                      value={form.person_first_name}
+                      onChange={(e) => setForm({ ...form, person_first_name: e.target.value })}
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Email</label>
+                    <input
+                      type="text"
+                      style={styles.input}
+                      value={form.person_email}
+                      onChange={(e) => setForm({ ...form, person_email: e.target.value })}
+                      onBlur={() => setEmailError(validateEmail(form.person_email.trim()))}
+                    />
+                    {emailError && (
+                      <div style={{ fontSize: "0.8rem", color: "#e65100", marginTop: "4px" }}>{emailError}</div>
+                    )}
                   </div>
                 </>
               )}
@@ -256,7 +405,7 @@ export default function AdminUsers() {
                 <select
                   style={styles.input}
                   value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value, cost_center_ids: [] })}
+                  onChange={(e) => setForm({ ...form, role: e.target.value, region: "" })}
                   required
                 >
                   <option value="pv">PV</option>
@@ -264,49 +413,23 @@ export default function AdminUsers() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              {showCostCenter && (
+              {showRegion && (
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Költséghelyek</label>
-                  <div style={{
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    maxHeight: "180px",
-                    overflowY: "auto",
-                    padding: "4px 0",
-                  }}>
-                    {costCenters.length === 0 && (
-                      <div style={{ padding: "8px 12px", fontSize: "0.85rem", color: "#999" }}>
-                        Nincs elérhető költséghely
-                      </div>
-                    )}
-                    {costCenters.map((cc) => (
-                      <label key={cc.id} style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        padding: "6px 12px",
-                        cursor: "pointer",
-                        fontSize: "0.9rem",
-                        color: "#333",
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={form.cost_center_ids.includes(cc.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setForm({ ...form, cost_center_ids: [...form.cost_center_ids, cc.id] });
-                            } else {
-                              setForm({ ...form, cost_center_ids: form.cost_center_ids.filter((id) => id !== cc.id) });
-                            }
-                          }}
-                        />
-                        {cc.code} – {cc.name}
-                      </label>
+                  <label style={styles.label}>Régió</label>
+                  <select
+                    style={styles.input}
+                    value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })}
+                    required
+                  >
+                    <option value="">— válassz régiót —</option>
+                    {[...new Set(costCenters.map(cc => cc.region).filter(Boolean))].sort().map((r) => (
+                      <option key={r} value={r}>{r}</option>
                     ))}
-                  </div>
-                  {form.role === "pv" && form.cost_center_ids.length === 0 && (
+                  </select>
+                  {form.role === "pv" && !form.region && (
                     <div style={{ fontSize: "0.8rem", color: "#e65100", marginTop: "4px" }}>
-                      Legalább egy költséghely kötelező PV szerepkörhöz
+                      PV szerepkörhöz régió kötelező
                     </div>
                   )}
                 </div>
@@ -465,6 +588,8 @@ const styles = {
     borderRadius: "8px",
     padding: "2rem",
     minWidth: "360px",
+    maxHeight: "90vh",
+    overflowY: "auto",
     boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
   },
   modalTitle: {

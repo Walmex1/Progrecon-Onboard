@@ -53,9 +53,10 @@ def get_pv_stats(
     stats = []
     total_all = 0
 
-    cost_centers = current_user.cost_centers
     if current_user.role == "admin":
         cost_centers = db.query(CostCenter).filter(CostCenter.is_active == True).order_by(CostCenter.code).all()
+    else:
+        cost_centers = db.query(CostCenter).filter(CostCenter.region == current_user.region, CostCenter.is_active == True).order_by(CostCenter.code).all()
 
     for cc in cost_centers:
         total = db.query(Employee).filter(Employee.cost_center_id == cc.id).count()

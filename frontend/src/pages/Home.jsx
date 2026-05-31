@@ -35,10 +35,10 @@ function formatDelta(value) {
   return String(value);
 }
 
-function deltaStyle(value) {
-  if (value > 0) return styles.deltaPositive;
-  if (value < 0) return styles.deltaNegative;
-  return styles.deltaNeutral;
+function deltaColor(value) {
+  if (value > 0) return "#2E7D32";
+  if (value < 0) return "#C62828";
+  return "#9e9e9e";
 }
 
 function StatCard({ label, value, hint }) {
@@ -46,18 +46,20 @@ function StatCard({ label, value, hint }) {
     <div style={styles.statCard}>
       <div style={styles.statLabel}>{label}</div>
       <div style={styles.statValue}>{value}</div>
-      <div style={styles.statHint}>{hint}</div>
+      {hint && <div style={styles.statHint}>{hint}</div>}
     </div>
   );
 }
 
 function WelcomeCard({ role }) {
   return (
-    <div style={styles.card}>
-      <h1 style={styles.title}>Üdvözöl a Progrecon Onboard rendszer</h1>
-      <p style={styles.role}>
-        Bejelentkezett felhasználó szerepköre: <strong>{role || "-"}</strong>
-      </p>
+    <div style={styles.pageWrapper}>
+      <div style={styles.card}>
+        <div style={styles.cardTitle}>Üdvözöl a Progrecon Onboard rendszer</div>
+        <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>
+          Bejelentkezett szerepkör: <strong style={{ fontWeight: 500 }}>{role || "—"}</strong>
+        </p>
+      </div>
     </div>
   );
 }
@@ -94,45 +96,32 @@ function PvHome() {
     }
 
     load();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  if (loading) {
-    return <div style={styles.card}>Betöltés...</div>;
-  }
-
-  if (error) {
-    return <div style={styles.errorBox}>{error}</div>;
-  }
+  if (loading) return <div style={styles.pageWrapper}><div style={styles.card}>Betöltés...</div></div>;
+  if (error) return <div style={styles.pageWrapper}><div style={styles.errorBox}>{error}</div></div>;
 
   return (
-    <div style={styles.page}>
-      <div style={styles.statGridThree}>
+    <div style={styles.pageWrapper}>
+      <div style={styles.statGrid3}>
         <StatCard label="Összes munkavállaló" value={stats.total_all} hint="fő összesen" />
         <StatCard label="Folyamatban lévő belépők" value={draftCount} hint="rekord félkész" />
         <StatCard label="Elküldve" value={sentCount} hint="bérszámfejtőnél" />
       </div>
 
-      <div style={styles.companyGrid}>
+      <div style={styles.ccGrid}>
         {stats.cost_centers.map((cc) => (
-          <div key={cc.cost_center_id} style={styles.companyCard}>
-            <div style={styles.companyCode}>{cc.code}</div>
-            <div style={styles.companyName}>{cc.name}</div>
-            <div style={styles.companyTotal}>{cc.total} fő</div>
+          <div key={cc.cost_center_id} style={styles.ccCard}>
+            <div style={styles.ccCode}>{cc.code}</div>
+            <div style={styles.ccName}>{cc.name}</div>
+            <div style={styles.ccTotal}>{cc.total} <span style={styles.ccUnit}>fő</span></div>
             <div style={styles.deltaRow}>
-              <span>
-                Ma: <strong style={deltaStyle(cc.delta_today)}>{formatDelta(cc.delta_today)}</strong>
-              </span>
-              <span style={styles.separator}>|</span>
-              <span>
-                7 nap: <strong style={deltaStyle(cc.delta_week)}>{formatDelta(cc.delta_week)}</strong>
-              </span>
-              <span style={styles.separator}>|</span>
-              <span>
-                30 nap: <strong style={deltaStyle(cc.delta_month)}>{formatDelta(cc.delta_month)}</strong>
-              </span>
+              <span>Ma: <span style={{ color: deltaColor(cc.delta_today), fontWeight: 500 }}>{formatDelta(cc.delta_today)}</span></span>
+              <span style={styles.sep}>·</span>
+              <span>7 nap: <span style={{ color: deltaColor(cc.delta_week), fontWeight: 500 }}>{formatDelta(cc.delta_week)}</span></span>
+              <span style={styles.sep}>·</span>
+              <span>30 nap: <span style={{ color: deltaColor(cc.delta_month), fontWeight: 500 }}>{formatDelta(cc.delta_month)}</span></span>
             </div>
           </div>
         ))}
@@ -179,22 +168,15 @@ function AdminHome() {
     }
 
     load();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  if (loading) {
-    return <div style={styles.card}>Betöltés...</div>;
-  }
-
-  if (error) {
-    return <div style={styles.errorBox}>{error}</div>;
-  }
+  if (loading) return <div style={styles.pageWrapper}><div style={styles.card}>Betöltés...</div></div>;
+  if (error) return <div style={styles.pageWrapper}><div style={styles.errorBox}>{error}</div></div>;
 
   return (
-    <div style={styles.page}>
-      <div style={styles.statGridFour}>
+    <div style={styles.pageWrapper}>
+      <div style={styles.statGrid4}>
         <StatCard label="Felhasználók száma" value={adminStats.usersTotal} hint="összesen" />
         <StatCard label="Aktív felhasználók" value={adminStats.usersActive} hint="használatban" />
         <StatCard label="Költséghelyek száma" value={adminStats.costCentersTotal} hint="összesen" />
@@ -207,32 +189,26 @@ function AdminHome() {
             <div style={styles.quickIcon}>{link.icon}</div>
             <div>
               <div style={styles.quickTitle}>{link.title}</div>
-              <div style={styles.quickDescription}>{link.description}</div>
+              <div style={styles.quickDesc}>{link.description}</div>
             </div>
           </button>
         ))}
       </div>
 
       <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>Munkavállalók költséghelyenként</h2>
-        <div style={styles.companyGrid}>
+        <div style={styles.cardTitle}>Munkavállalók költséghelyenként</div>
+        <div style={styles.ccGrid}>
           {pvStats.cost_centers.map((cc) => (
-            <div key={cc.cost_center_id} style={styles.companyCard}>
-              <div style={styles.companyCode}>{cc.code}</div>
-              <div style={styles.companyName}>{cc.name}</div>
-              <div style={styles.companyTotal}>{cc.total} fő</div>
+            <div key={cc.cost_center_id} style={styles.ccCard}>
+              <div style={styles.ccCode}>{cc.code}</div>
+              <div style={styles.ccName}>{cc.name}</div>
+              <div style={styles.ccTotal}>{cc.total} <span style={styles.ccUnit}>fő</span></div>
               <div style={styles.deltaRow}>
-                <span>
-                  Ma: <strong style={deltaStyle(cc.delta_today)}>{formatDelta(cc.delta_today)}</strong>
-                </span>
-                <span style={styles.separator}>|</span>
-                <span>
-                  7 nap: <strong style={deltaStyle(cc.delta_week)}>{formatDelta(cc.delta_week)}</strong>
-                </span>
-                <span style={styles.separator}>|</span>
-                <span>
-                  30 nap: <strong style={deltaStyle(cc.delta_month)}>{formatDelta(cc.delta_month)}</strong>
-                </span>
+                <span>Ma: <span style={{ color: deltaColor(cc.delta_today), fontWeight: 500 }}>{formatDelta(cc.delta_today)}</span></span>
+                <span style={styles.sep}>·</span>
+                <span>7 nap: <span style={{ color: deltaColor(cc.delta_week), fontWeight: 500 }}>{formatDelta(cc.delta_week)}</span></span>
+                <span style={styles.sep}>·</span>
+                <span>30 nap: <span style={{ color: deltaColor(cc.delta_month), fontWeight: 500 }}>{formatDelta(cc.delta_month)}</span></span>
               </div>
             </div>
           ))}
@@ -251,161 +227,147 @@ export default function Home() {
 }
 
 const styles = {
-  page: {
+  pageWrapper: {
+    padding: "24px",
     display: "flex",
     flexDirection: "column",
-    gap: "1.5rem",
+    gap: "16px",
   },
   card: {
     background: "#fff",
-    borderRadius: "8px",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-    padding: "2rem",
+    border: "0.5px solid #e2e4e9",
+    borderRadius: "12px",
+    padding: "20px 24px",
   },
-  title: {
-    margin: "0 0 1rem",
+  cardTitle: {
+    fontSize: "13px",
     fontWeight: 500,
-    fontSize: "1.5rem",
-    color: "#2c3e50",
+    color: "#1a1a2e",
+    marginBottom: "16px",
   },
-  role: {
-    margin: 0,
-    color: "#555",
-    fontSize: "0.95rem",
-  },
-  sectionTitle: {
-    margin: "0 0 1rem",
-    fontWeight: 500,
-    fontSize: "1.2rem",
-    color: "#2c3e50",
-  },
-  statGridThree: {
+  statGrid3: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "1rem",
+    gap: "12px",
   },
-  statGridFour: {
+  statGrid4: {
     display: "grid",
     gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "1rem",
+    gap: "12px",
   },
   statCard: {
-    background: "#f8f9fa",
-    borderRadius: "6px",
-    padding: "1rem 1.25rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+    background: "#fff",
+    border: "0.5px solid #e2e4e9",
+    borderRadius: "8px",
+    padding: "14px 16px",
   },
   statLabel: {
-    color: "#555",
-    fontSize: "0.85rem",
-    marginBottom: "0.5rem",
+    fontSize: "11px",
+    color: "#6b7280",
+    marginBottom: "4px",
   },
   statValue: {
-    color: "#2c3e50",
-    fontSize: "2rem",
-    fontWeight: 600,
+    fontSize: "22px",
+    fontWeight: 500,
+    color: "#1a1a2e",
     lineHeight: 1,
   },
   statHint: {
-    color: "#777",
-    fontSize: "0.85rem",
-    marginTop: "0.5rem",
+    fontSize: "11px",
+    color: "#9ca3af",
+    marginTop: "4px",
   },
-  companyGrid: {
+  ccGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "1rem",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "12px",
   },
-  companyCard: {
+  ccCard: {
     background: "#fff",
-    border: "1px solid #e0e0e0",
-    borderRadius: "8px",
-    padding: "1.25rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+    border: "0.5px solid #e2e4e9",
+    borderRadius: "12px",
+    padding: "16px 20px",
   },
-  companyCode: {
-    color: "#2c3e50",
-    fontSize: "1.05rem",
-    fontWeight: 600,
-    marginBottom: "0.25rem",
+  ccCode: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#6b7280",
+    marginBottom: "2px",
   },
-  companyName: {
-    color: "#777",
-    fontSize: "0.9rem",
-    minHeight: "2.4rem",
+  ccName: {
+    fontSize: "12px",
+    color: "#9ca3af",
+    minHeight: "32px",
   },
-  companyTotal: {
-    color: "#2c3e50",
-    fontSize: "2rem",
-    fontWeight: 600,
-    margin: "1.25rem 0",
+  ccTotal: {
+    fontSize: "22px",
+    fontWeight: 500,
+    color: "#1a1a2e",
+    margin: "10px 0",
+  },
+  ccUnit: {
+    fontSize: "13px",
+    fontWeight: 400,
+    color: "#9ca3af",
   },
   deltaRow: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "0.5rem",
+    gap: "6px",
     alignItems: "center",
-    color: "#555",
-    fontSize: "0.85rem",
+    fontSize: "11px",
+    color: "#6b7280",
   },
-  separator: {
-    color: "#ccc",
-  },
-  deltaPositive: {
-    color: "#2e7d32",
-  },
-  deltaNeutral: {
-    color: "#888",
-  },
-  deltaNegative: {
-    color: "#b71c1c",
+  sep: {
+    color: "#d1d5db",
   },
   quickGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "1rem",
+    gap: "12px",
   },
   quickCard: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "1rem",
+    gap: "12px",
     textAlign: "left",
     background: "#fff",
-    border: "1px solid #e0e0e0",
-    borderRadius: "8px",
-    padding: "1.25rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+    border: "0.5px solid #e2e4e9",
+    borderRadius: "12px",
+    padding: "16px 20px",
     cursor: "pointer",
+    width: "100%",
   },
   quickIcon: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "6px",
-    background: "#e3f2fd",
-    color: "#1565c0",
+    width: "32px",
+    height: "32px",
+    borderRadius: "8px",
+    background: "#eeedfe",
+    color: "#534AB7",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontWeight: 700,
+    fontSize: "13px",
+    fontWeight: 500,
     flexShrink: 0,
   },
   quickTitle: {
-    color: "#2c3e50",
-    fontSize: "1rem",
-    fontWeight: 600,
-    marginBottom: "0.35rem",
+    fontSize: "13px",
+    fontWeight: 500,
+    color: "#1a1a2e",
+    marginBottom: "3px",
   },
-  quickDescription: {
-    color: "#666",
-    fontSize: "0.88rem",
+  quickDesc: {
+    fontSize: "12px",
+    color: "#6b7280",
     lineHeight: 1.4,
   },
   errorBox: {
-    background: "#fdecea",
-    border: "1px solid #f5c6cb",
-    color: "#b71c1c",
-    borderRadius: "4px",
-    padding: "0.8rem 1rem",
-    fontSize: "0.9rem",
+    background: "#fef2f2",
+    border: "0.5px solid #fecaca",
+    color: "#b91c1c",
+    borderRadius: "8px",
+    padding: "12px 16px",
+    fontSize: "12.5px",
   },
 };

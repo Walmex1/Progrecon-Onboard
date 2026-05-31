@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.security import create_access_token
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.auth import LoginRequest, PersonShort, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -18,10 +18,22 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             detail="Hibás felhasználónév",
         )
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="A felhasználó inaktív",
+        )
+
     token = create_access_token(user.id, user.role)
-    cost_center_ids = [cc.id for cc in user.cost_centers]
+    person = None
+    if user.person:
+        person = PersonShort(
+            last_name=user.person.last_name,
+            first_name=user.person.first_name,
+        )
     return TokenResponse(
         access_token=token,
         role=user.role,
-        cost_center_ids=cost_center_ids,
+        region=user.region,
+        person=person,
     )

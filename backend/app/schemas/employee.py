@@ -8,22 +8,18 @@ class EmployeeBase(BaseModel):
     last_name: str
     first_name: str
     birth_date: Optional[date] = None
+    entry_date: Optional[date] = None
     taj: Optional[str] = None
     trunk_number: Optional[str] = None
+    birth_place: Optional[str] = None
+    mothers_name: Optional[str] = None
+    birth_name: Optional[str] = None
+    gender: Optional[str] = None
     cost_center_id: Optional[int] = None
 
 
 class EmployeeCreate(EmployeeBase):
     pass
-
-
-class EmployeeUpdate(BaseModel):
-    last_name: Optional[str] = None
-    first_name: Optional[str] = None
-    birth_date: Optional[date] = None
-    taj: Optional[str] = None
-    trunk_number: Optional[str] = None
-    cost_center_id: Optional[int] = None
 
 
 class EmployeeResponse(EmployeeBase):

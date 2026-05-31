@@ -6,7 +6,7 @@ from app.database import get_db
 from app.dependencies import require_role
 from app.models.employee import Employee
 from app.models.cost_center import CostCenter
-from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse, EmployeeImportResult
+from app.schemas.employee import EmployeeCreate, EmployeeResponse, EmployeeImportResult
 from app.services.employee_import import import_employees_from_xlsx
 
 router = APIRouter(prefix="/admin/employees", tags=["employees"])
@@ -26,6 +26,7 @@ def _enrich(emp: Employee) -> dict:
         "updated_at": emp.updated_at,
         "cost_center_code": emp.cost_center.code if emp.cost_center else None,
         "cost_center_name": emp.cost_center.name if emp.cost_center else None,
+        "entry_date": emp.entry_date,
     }
     return d
 
@@ -91,37 +92,9 @@ def create_employee(
     return _enrich(emp)
 
 
-@router.patch("/{employee_id}", response_model=EmployeeResponse)
-def update_employee(
-    employee_id: int,
-    data: EmployeeUpdate,
-    db: Session = Depends(get_db),
-    _=Depends(require_role("admin")),
-):
-    emp = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not emp:
-        raise HTTPException(status_code=404, detail="Munkavállaló nem található.")
-
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(emp, field, value)
-
-    db.commit()
-    db.refresh(emp)
-    emp = db.query(Employee).outerjoin(Employee.cost_center).filter(Employee.id == emp.id).first()
-    return _enrich(emp)
-
-
-@router.delete("/{employee_id}", status_code=204)
-def delete_employee(
-    employee_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(require_role("admin")),
-):
-    emp = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not emp:
-        raise HTTPException(status_code=404, detail="Munkavállaló nem található.")
-    db.delete(emp)
-    db.commit()
+@router.api_route("/{employee_id}", methods=["PATCH", "DELETE"], include_in_schema=False)
+def employee_mutation_not_allowed(employee_id: int):
+    raise HTTPException(status_code=405, detail="Method Not Allowed")
 
 
 @router.post("/import", response_model=EmployeeImportResult)

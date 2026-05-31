@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import client from "../api/client";
-
-const EMPTY_EDIT = {
-  last_name: "",
-  first_name: "",
-  birth_date: "",
-  taj: "",
-  trunk_number: "",
-  cost_center_id: "",
-};
 
 export default function AdminEmployees() {
   const [employees, setEmployees] = useState([]);
@@ -17,15 +9,11 @@ export default function AdminEmployees() {
   const [error, setError] = useState(null);
   const [q, setQ] = useState("");
   const [costCenterId, setCostCenterId] = useState("");
-
-  const [editingEmployee, setEditingEmployee] = useState(null);
-  const [form, setForm] = useState(EMPTY_EDIT);
-  const [formError, setFormError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [sortField, setSortField] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
 
   async function fetchEmployees() {
@@ -47,20 +35,12 @@ export default function AdminEmployees() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       async function loadInitial() {
-        setLoading(true);
-        setError(null);
         try {
-          const [employeesRes, costCentersRes] = await Promise.all([
-            client.get("/admin/employees/"),
-            client.get("/admin/cost-centers/", { params: { active_only: true } }),
-          ]);
-          setEmployees(employeesRes.data);
+          const costCentersRes = await client.get("/admin/cost-centers/", { params: { active_only: true } });
           setCostCenters(costCentersRes.data);
         } catch (e) {
           setError(e.response?.data?.detail || "Hiba a betöltés során");
           setCostCenters([]);
-        } finally {
-          setLoading(false);
         }
       }
 
@@ -69,61 +49,12 @@ export default function AdminEmployees() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  function handleSearch(e) {
-    e.preventDefault();
-    fetchEmployees();
-  }
-
-  function openEdit(employee) {
-    setEditingEmployee(employee);
-    setForm({
-      last_name: employee.last_name ?? "",
-      first_name: employee.first_name ?? "",
-      birth_date: employee.birth_date ?? "",
-      taj: employee.taj ?? "",
-      trunk_number: employee.trunk_number ?? "",
-      cost_center_id: employee.cost_center_id ?? "",
-    });
-    setFormError(null);
-  }
-
-  function closeModal() {
-    setEditingEmployee(null);
-    setForm(EMPTY_EDIT);
-  }
-
-  async function handleEdit(e) {
-    e.preventDefault();
-    setFormError(null);
-    setSaving(true);
-    try {
-      const payload = {
-        last_name: form.last_name,
-        first_name: form.first_name,
-        birth_date: form.birth_date || null,
-        taj: form.taj || null,
-        trunk_number: form.trunk_number || null,
-        cost_center_id: form.cost_center_id ? Number(form.cost_center_id) : null,
-      };
-      await client.patch(`/admin/employees/${editingEmployee.id}`, payload);
-      closeModal();
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
       fetchEmployees();
-    } catch (e) {
-      setFormError(e.response?.data?.detail || "Hiba a mentés során");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(id) {
-    if (!window.confirm("Biztosan véglegesen törlöd ezt a munkavállalót?")) return;
-    try {
-      await client.delete(`/admin/employees/${id}`);
-      fetchEmployees();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba a törlés során");
-    }
-  }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [q, costCenterId]);
 
   async function handleImport() {
     if (!selectedFile) {
@@ -131,7 +62,6 @@ export default function AdminEmployees() {
       return;
     }
     setError(null);
-    setImportResult(null);
     setImporting(true);
     try {
       const data = new FormData();
@@ -139,19 +69,64 @@ export default function AdminEmployees() {
       const res = await client.post("/admin/employees/import", data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setImportResult(res.data);
+      const r = res.data;
+      const msg = `Létrehozva: ${r.created} | Frissítve: ${r.updated} | Kihagyva: ${r.skipped}`;
+      if (r.errors?.length > 0) {
+        toast.warning(msg + `\n${r.errors.slice(0, 3).join("\n")}${r.errors.length > 3 ? `\n...+${r.errors.length - 3} hiba` : ""}`);
+      } else {
+        toast.success(msg);
+      }
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       fetchEmployees();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba az import során");
+    } catch {
+      // interceptor kezeli
     } finally {
       setImporting(false);
     }
   }
 
-  const visibleErrors = importResult?.errors?.slice(0, 10) ?? [];
-  const remainingErrors = Math.max((importResult?.errors?.length ?? 0) - visibleErrors.length, 0);
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedEmployees = [...employees].sort((a, b) => {
+    if (!sortField) return 0;
+    let aVal = "";
+    let bVal = "";
+    if (sortField === "name") {
+      aVal = `${a.last_name} ${a.first_name}`;
+      bVal = `${b.last_name} ${b.first_name}`;
+    } else if (sortField === "birth_date") {
+      aVal = a.birth_date ?? "";
+      bVal = b.birth_date ?? "";
+    } else if (sortField === "entry_date") {
+      aVal = a.entry_date ?? "";
+      bVal = b.entry_date ?? "";
+    } else if (sortField === "tax_id") {
+      aVal = a.tax_id ?? "";
+      bVal = b.tax_id ?? "";
+    } else if (sortField === "taj") {
+      aVal = a.taj ?? "";
+      bVal = b.taj ?? "";
+    } else if (sortField === "cost_center_code") {
+      aVal = a.cost_center_code ?? "";
+      bVal = b.cost_center_code ?? "";
+    } else if (sortField === "cost_center_name") {
+      aVal = a.cost_center_name ?? "";
+      bVal = b.cost_center_name ?? "";
+    }
+    aVal = aVal.toString().toLowerCase();
+    bVal = bVal.toString().toLowerCase();
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
   return (
     <div style={styles.card}>
@@ -159,7 +134,7 @@ export default function AdminEmployees() {
         <h1 style={styles.title}>Munkavállalók</h1>
       </div>
 
-      <form onSubmit={handleSearch} style={{ ...styles.header, alignItems: "flex-end", gap: "0.75rem" }}>
+      <div style={{ ...styles.header, alignItems: "flex-end", gap: "0.75rem" }}>
         <div style={{ ...styles.formGroup, marginBottom: 0, flex: 1 }}>
           <label style={styles.label}>Keresés</label>
           <input
@@ -180,9 +155,6 @@ export default function AdminEmployees() {
             ))}
           </select>
         </div>
-        <button type="submit" style={styles.btnPrimary}>
-          Keresés
-        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -196,27 +168,11 @@ export default function AdminEmployees() {
         <button type="button" style={styles.btnPrimary} onClick={handleImport} disabled={importing}>
           {importing ? "Feltöltés..." : "Feltöltés"}
         </button>
-      </form>
+      </div>
 
       {selectedFile && (
         <div style={{ color: "#555", fontSize: "0.85rem", marginBottom: "1rem" }}>
           Kiválasztott fájl: {selectedFile.name}
-        </div>
-      )}
-
-      {importResult && (
-        <div style={styles.errorBox}>
-          <div>
-            Létrehozva: {importResult.created} | Frissítve: {importResult.updated} | Kihagyva: {importResult.skipped}
-          </div>
-          {visibleErrors.length > 0 && (
-            <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.25rem" }}>
-              {visibleErrors.map((item, index) => (
-                <li key={`${item}-${index}`}>{item}</li>
-              ))}
-              {remainingErrors > 0 && <li>... és {remainingErrors} további hiba</li>}
-            </ul>
-          )}
         </div>
       )}
 
@@ -228,115 +184,47 @@ export default function AdminEmployees() {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Név</th>
-              <th style={styles.th}>Adóazonosító</th>
-              <th style={styles.th}>TAJ</th>
-              <th style={styles.th}>Törzsszám</th>
-              <th style={styles.th}>Költséghely</th>
-              <th style={styles.th}>Műveletek</th>
+              {[
+                { field: "name", label: "Név" },
+                { field: "birth_date", label: "Születési idő" },
+                { field: "entry_date", label: "Jogviszony kezdete" },
+                { field: "tax_id", label: "Adóazonosító" },
+                { field: "taj", label: "TAJ" },
+                { field: "cost_center_code", label: "Ktgh. kód" },
+                { field: "cost_center_name", label: "Költséghely" },
+              ].map(({ field, label }) => (
+                <th
+                  key={field}
+                  style={{ ...styles.th, cursor: "pointer", userSelect: "none" }}
+                  onClick={() => handleSort(field)}
+                >
+                  {label}
+                  {sortField === field ? (sortDir === "asc" ? " ▲" : " ▼") : " ↕"}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {employees.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ ...styles.td, color: "#999", textAlign: "center" }}>
+                <td colSpan={7} style={{ ...styles.td, color: "#999", textAlign: "center" }}>
                   Nincs rögzített munkavállaló
                 </td>
               </tr>
             )}
-            {employees.map((employee) => (
+            {sortedEmployees.map((employee) => (
               <tr key={employee.id} style={styles.tr}>
                 <td style={styles.td}>{`${employee.last_name} ${employee.first_name}`}</td>
+                <td style={styles.td}>{employee.birth_date ?? "—"}</td>
+                <td style={styles.td}>{employee.entry_date ?? "—"}</td>
                 <td style={styles.td}>{employee.tax_id}</td>
                 <td style={styles.td}>{employee.taj ?? "—"}</td>
-                <td style={styles.td}>{employee.trunk_number ?? "—"}</td>
                 <td style={styles.td}>{employee.cost_center_code ?? "—"}</td>
-                <td style={styles.td}>
-                  <button style={styles.btnEdit} onClick={() => openEdit(employee)}>
-                    Szerkesztés
-                  </button>
-                  <button style={{ ...styles.btnDanger, marginLeft: "0.5rem" }} onClick={() => handleDelete(employee.id)}>
-                    Törlés
-                  </button>
-                </td>
+                <td style={styles.td}>{employee.cost_center_name ?? "—"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      )}
-
-      {editingEmployee && (
-        <div style={styles.overlay} onClick={closeModal}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>Munkavállaló szerkesztése</h2>
-            <form onSubmit={handleEdit}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Vezetéknév</label>
-                <input
-                  style={styles.input}
-                  value={form.last_name}
-                  onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Keresztnév</label>
-                <input
-                  style={styles.input}
-                  value={form.first_name}
-                  onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-                  required
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Születési dátum</label>
-                <input
-                  type="date"
-                  style={styles.input}
-                  value={form.birth_date}
-                  onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>TAJ</label>
-                <input style={styles.input} value={form.taj} onChange={(e) => setForm({ ...form, taj: e.target.value })} />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Törzsszám</label>
-                <input
-                  style={styles.input}
-                  value={form.trunk_number}
-                  onChange={(e) => setForm({ ...form, trunk_number: e.target.value })}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Költséghely</label>
-                <select
-                  style={styles.input}
-                  value={form.cost_center_id}
-                  onChange={(e) => setForm({ ...form, cost_center_id: e.target.value })}
-                >
-                  <option value="">Nincs</option>
-                  {costCenters.map((cc) => (
-                    <option key={cc.id} value={cc.id}>
-                      {cc.code} - {cc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {formError && <div style={styles.errorBox}>{formError}</div>}
-              <div style={styles.modalFooter}>
-                <button type="button" style={styles.btnSecondary} onClick={closeModal}>
-                  Mégse
-                </button>
-                <button type="submit" style={styles.btnPrimary} disabled={saving}>
-                  {saving ? "Mentés..." : "Mentés"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
@@ -429,15 +317,6 @@ const styles = {
     cursor: "pointer",
     fontSize: "0.9rem",
   },
-  btnEdit: {
-    background: "#e3f2fd",
-    color: "#1565c0",
-    border: "1px solid #90caf9",
-    padding: "4px 12px",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "0.85rem",
-  },
   btnWarning: {
     background: "#fff3e0",
     color: "#e65100",
@@ -451,15 +330,6 @@ const styles = {
     background: "#e8f5e9",
     color: "#2e7d32",
     border: "1px solid #a5d6a7",
-    padding: "4px 12px",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "0.85rem",
-  },
-  btnDanger: {
-    background: "#fdecea",
-    color: "#b71c1c",
-    border: "1px solid #ef9a9a",
     padding: "4px 12px",
     borderRadius: "4px",
     cursor: "pointer",

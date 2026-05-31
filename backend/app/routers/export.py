@@ -1,5 +1,5 @@
-import zipfile
 import io
+import zipfile
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,14 +8,16 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import require_role
-from app.models.user import User
-from app.models.entry_record import EntryRecord
-from app.models.csv_export import CsvExport
 from app.models.audit_log import AuditLog
+from app.models.csv_export import CsvExport
+from app.models.entry_record import EntryRecord
+from app.models.user import User
 from app.services.csv_generator import generate_csvs_for_entry
+from app.services.entry_service import mark_csv_downloaded
 from app.services.validator import validate_entry_form
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+
 
 @router.post("/{entry_id}")
 def export_csvs(
@@ -29,22 +31,18 @@ def export_csvs(
     if entry.status not in ("elküldve", "csv_letöltve"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Csak elküldött rekordhoz generálható CSV")
 
-    # Validáció
     errors = validate_entry_form(entry.form_data)
     if errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"validation_errors": errors})
 
-    # CSV generálás
-    csvs = generate_csvs_for_entry(entry.form_data)
+    try:
+        csvs = generate_csvs_for_entry(entry.form_data)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CSV generálás sikertelen. Ellenőrizd az adatlap tartalmát.",
+        )
 
-    # ZIP összerakása
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for filename, content in csvs.items():
-            zf.writestr(filename, content)
-    zip_buffer.seek(0)
-
-    # Naplózás
     now = datetime.now(timezone.utc)
     for filename in csvs:
         db.add(CsvExport(
@@ -62,15 +60,32 @@ def export_csvs(
         old_data=None,
         new_data={"files": list(csvs.keys())},
     ))
-    entry.status = "csv_letöltve"
+    mark_csv_downloaded(db, entry, current_user.id)
     db.commit()
 
-    filename_zip = f"belep_{entry_id}_{now.strftime('%Y%m%d_%H%M%S')}.zip"
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    if len(csvs) == 1:
+        csv_buffer = io.BytesIO(next(iter(csvs.values())))
+        filename_csv = f"NBTorzs_belep_{entry_id}_{timestamp}.csv"
+        return StreamingResponse(
+            csv_buffer,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename_csv}"},
+        )
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for filename, content in csvs.items():
+            zf.writestr(filename, content)
+    zip_buffer.seek(0)
+
+    filename_zip = f"belep_{entry_id}_{timestamp}.zip"
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={filename_zip}"},
     )
+
 
 @router.get("/history/{entry_id}")
 def export_history(

@@ -4,7 +4,7 @@ from typing import Any
 
 class EntryRecordCreate(BaseModel):
     record_type: str = "belep"
-    cost_center_id: int
+    cost_center_id: int | None = None
     form_data: dict[str, Any] = {}
 
 class EntryRecordPatch(BaseModel):
@@ -14,7 +14,7 @@ class EntryRecordResponse(BaseModel):
     id: int
     record_type: str
     status: str
-    cost_center_id: int
+    cost_center_id: int | None
     form_data: dict[str, Any]
     created_at: datetime
     submitted_at: datetime | None

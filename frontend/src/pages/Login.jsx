@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await client.post("/auth/login", { username: form.username });
-      login(res.data.access_token, res.data.role, res.data.cost_center_ids ?? []);
+      login(res.data.access_token, res.data.role, res.data.region ?? null, res.data.person ?? null);
       navigate("/");
     } catch {
       setError("Hibás felhasználónév");

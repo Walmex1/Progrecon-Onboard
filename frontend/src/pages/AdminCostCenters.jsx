@@ -6,9 +6,14 @@ export default function AdminCostCenters() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ code: "", name: "" });
+  const [form, setForm] = useState({ code: "", name: "", region: "" });
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [editingCc, setEditingCc] = useState(null);
+  const [editRegion, setEditRegion] = useState("");
+  const [sortField, setSortField] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
+  const [search, setSearch] = useState("");
 
   async function fetchCostCenters() {
     setLoading(true);
@@ -23,6 +28,33 @@ export default function AdminCostCenters() {
     }
   }
 
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedCostCenters = [...costCenters].sort((a, b) => {
+    if (!sortField) return 0;
+    const aVal = (a[sortField] ?? "").toString().toLowerCase();
+    const bVal = (b[sortField] ?? "").toString().toLowerCase();
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const filteredCostCenters = sortedCostCenters.filter((cc) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return (
+      cc.code.toLowerCase().includes(q) ||
+      cc.name.toLowerCase().includes(q)
+    );
+  });
+
   useEffect(() => {
     fetchCostCenters();
   }, []);
@@ -32,9 +64,13 @@ export default function AdminCostCenters() {
     setFormError(null);
     setSaving(true);
     try {
-      await client.post("/admin/cost-centers/", form);
+      await client.post("/admin/cost-centers/", {
+        code: form.code,
+        name: form.name,
+        region: form.region || null,
+      });
       setModalOpen(false);
-      setForm({ code: "", name: "" });
+      setForm({ code: "", name: "", region: "" });
       fetchCostCenters();
     } catch (e) {
       setFormError(e.response?.data?.detail || "Hiba a mentés során");
@@ -47,8 +83,8 @@ export default function AdminCostCenters() {
     try {
       await client.post(`/admin/cost-centers/${id}/deactivate`);
       fetchCostCenters();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba a deaktiválás során");
+    } catch {
+      // interceptor kezeli
     }
   }
 
@@ -56,8 +92,23 @@ export default function AdminCostCenters() {
     try {
       await client.post(`/admin/cost-centers/${id}/activate`);
       fetchCostCenters();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba az aktiválás során");
+    } catch {
+      // interceptor kezeli
+    }
+  }
+
+  async function handleEditRegion(cc) {
+    setEditingCc(cc);
+    setEditRegion(cc.region || "");
+  }
+
+  async function handleSaveRegion() {
+    try {
+      await client.patch(`/admin/cost-centers/${editingCc.id}`, { region: editRegion || null });
+      setEditingCc(null);
+      fetchCostCenters();
+    } catch {
+      // interceptor kezeli
     }
   }
 
@@ -66,16 +117,24 @@ export default function AdminCostCenters() {
     try {
       await client.delete(`/admin/cost-centers/${id}`);
       fetchCostCenters();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Hiba a törlés során");
+    } catch {
+      // interceptor kezeli
     }
   }
+
+  const REGION_OPTIONS = [...new Set(costCenters.map(cc => cc.region).filter(Boolean))].sort();
 
   return (
     <div style={styles.card}>
       <div style={styles.header}>
         <h1 style={styles.title}>Költséghelyek</h1>
-        <button style={styles.btnPrimary} onClick={() => { setModalOpen(true); setFormError(null); setForm({ code: "", name: "" }); }}>
+        <input
+          style={{ ...styles.input, maxWidth: "260px" }}
+          placeholder="Keresés kódra, névre..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button style={styles.btnPrimary} onClick={() => { setModalOpen(true); setFormError(null); setForm({ code: "", name: "", region: "" }); }}>
           + Új költséghely
         </button>
       </div>
@@ -88,24 +147,33 @@ export default function AdminCostCenters() {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Kód</th>
-              <th style={styles.th}>Név</th>
+              {["code", "name", "region"].map((field, i) => (
+                <th
+                  key={field}
+                  style={{ ...styles.th, cursor: "pointer", userSelect: "none" }}
+                  onClick={() => handleSort(field)}
+                >
+                  {["Kód", "Név", "Régió"][i]}
+                  {sortField === field ? (sortDir === "asc" ? " ▲" : " ▼") : " ↕"}
+                </th>
+              ))}
               <th style={styles.th}>Státusz</th>
               <th style={styles.th}>Műveletek</th>
             </tr>
           </thead>
           <tbody>
-            {costCenters.length === 0 && (
+            {filteredCostCenters.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ ...styles.td, color: "#999", textAlign: "center" }}>
-                  Nincs rögzített költséghely
+                <td colSpan={5} style={{ ...styles.td, color: "#999", textAlign: "center" }}>
+                  {search.trim() ? "Nincs találat" : "Nincs rögzített költséghely"}
                 </td>
               </tr>
             )}
-            {costCenters.map((cc) => (
+            {filteredCostCenters.map((cc) => (
               <tr key={cc.id} style={styles.tr}>
                 <td style={styles.td}>{cc.code}</td>
                 <td style={styles.td}>{cc.name}</td>
+                <td style={styles.td}>{cc.region || "—"}</td>
                 <td style={styles.td}>
                   <span style={cc.is_active ? styles.badgeActive : styles.badgeInactive}>
                     {cc.is_active ? "Aktív" : "Inaktív"}
@@ -113,9 +181,14 @@ export default function AdminCostCenters() {
                 </td>
                 <td style={styles.td}>
                   {cc.is_active ? (
-                    <button style={styles.btnWarning} onClick={() => handleDeactivate(cc.id)}>
-                      Deaktiválás
-                    </button>
+                    <>
+                      <button style={styles.btnInfo} onClick={() => handleEditRegion(cc)}>
+                        Régió szerkesztése
+                      </button>
+                      <button style={{ ...styles.btnWarning, marginLeft: "0.5rem" }} onClick={() => handleDeactivate(cc.id)}>
+                        Deaktiválás
+                      </button>
+                    </>
                   ) : (
                     <>
                       <button style={styles.btnSuccess} onClick={() => handleActivate(cc.id)}>
@@ -157,6 +230,19 @@ export default function AdminCostCenters() {
                   required
                 />
               </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Régió</label>
+                <select
+                  style={styles.input}
+                  value={form.region}
+                  onChange={(e) => setForm({ ...form, region: e.target.value })}
+                >
+                  <option value="">— válassz régiót —</option>
+                  {REGION_OPTIONS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
               {formError && <div style={styles.errorBox}>{formError}</div>}
               <div style={styles.modalFooter}>
                 <button type="button" style={styles.btnSecondary} onClick={() => setModalOpen(false)}>
@@ -167,6 +253,41 @@ export default function AdminCostCenters() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {editingCc && (
+        <div style={styles.overlay} onClick={() => setEditingCc(null)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>Régió szerkesztése — {editingCc.name}</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Régió</label>
+              {(() => {
+                const existingRegions = [...new Set(costCenters.map(cc => cc.region).filter(Boolean))].sort();
+                return (
+                  <select
+                    style={styles.input}
+                    value={editRegion}
+                    onChange={(e) => setEditRegion(e.target.value)}
+                    autoFocus
+                  >
+                    <option value="">— törléshez hagyj üresen —</option>
+                    {existingRegions.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                );
+              })()}
+            </div>
+            <div style={styles.modalFooter}>
+              <button type="button" style={styles.btnSecondary} onClick={() => setEditingCc(null)}>
+                Mégse
+              </button>
+              <button type="button" style={styles.btnPrimary} onClick={handleSaveRegion}>
+                Mentés
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -288,6 +409,15 @@ const styles = {
     cursor: "pointer",
     fontSize: "0.85rem",
   },
+  btnInfo: {
+    background: "#e3f2fd",
+    color: "#1565c0",
+    border: "1px solid #90caf9",
+    padding: "4px 12px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+  },
   overlay: {
     position: "fixed",
     inset: 0,
@@ -302,6 +432,8 @@ const styles = {
     borderRadius: "8px",
     padding: "2rem",
     minWidth: "340px",
+    maxHeight: "90vh",
+    overflowY: "auto",
     boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
   },
   modalTitle: {

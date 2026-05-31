@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
 from app.models.user import User
 from app.schemas.entry_record import EntryRecordCreate, EntryRecordPatch, EntryRecordResponse
 from app.services import entry_service
@@ -43,6 +43,14 @@ def patch_entry(
 ):
     return entry_service.patch_entry(db, entry_id, body.form_data, current_user)
 
+@router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    entry_service.delete_entry(db, entry_id, current_user)
+
 @router.post("/{entry_id}/submit", response_model=EntryRecordResponse)
 def submit_entry(
     entry_id: int,
@@ -58,3 +66,11 @@ def recall_entry(
     current_user: User = Depends(get_current_user),
 ):
     return entry_service.recall_entry(db, entry_id, current_user)
+
+@router.post("/{entry_id}/close", response_model=EntryRecordResponse)
+def close_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("berszamfejto", "admin")),
+):
+    return entry_service.close_entry(db, entry_id, current_user)

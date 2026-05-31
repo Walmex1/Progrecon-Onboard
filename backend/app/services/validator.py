@@ -74,6 +74,46 @@ def validate_bank_account(account: str) -> tuple[bool, str]:
 def validate_entry_form(form_data: dict) -> list[dict]:
     errors = []
 
+    REQUIRED_FIELDS = [
+        # Személyes adatok
+        ("vezeteknev", "Vezetéknév kötelező"),
+        ("keresztnev", "Keresztnév kötelező"),
+        ("szuletesi_nev", "Születési név kötelező"),
+        ("anyja_neve", "Anyja neve kötelező"),
+        ("szuletesi_hely", "Születési hely kötelező"),
+        ("szuletesi_datum", "Születési dátum kötelező"),
+        ("neme", "Nem kötelező"),
+        ("allampolgarsag", "Állampolgárság kötelező"),
+        ("adoazonosito", "Adóazonosító jel kötelező"),
+        ("taj", "TAJ szám kötelező"),
+        # Lakcím
+        ("lakcim_orszag", "Lakcím ország kötelező"),
+        ("lakcim_iranyitoszam", "Irányítószám kötelező"),
+        ("lakcim_telepules", "Település kötelező"),
+        ("kozterulet", "Közterület neve kötelező"),
+        ("lakcim_kozterulet_jellege", "Közterület jellege kötelező"),
+        ("lakcim_hazszam", "Házszám kötelező"),
+        # Jogviszony
+        ("jogviszony_kezdete", "Jogviszony kezdete kötelező"),
+        ("munkaido_napi_ora", "Munkaidő kötelező"),
+        ("foglalkozasi_viszony", "Foglalkozási viszony kötelező"),
+        ("berezesi_mod", "Bérezés módja kötelező"),
+        ("besorolasi_ber", "Besorolási bér kötelező"),
+        # Munkakör és besorolás
+        ("regio", "Régió kötelező"),
+        ("egyseg", "Egység kötelező"),
+        ("munkakor", "Munkakör kötelező"),
+        ("feor", "FEOR szám kötelező"),
+        ("koltseghelyKod", "Költséghely kötelező"),
+        # Bankszámla
+        ("bankszamlaszam", "Bankszámlaszám kötelező"),
+        ("kedvezmenyezett_neve", "Kedvezményezett neve kötelező"),
+    ]
+
+    for field, message in REQUIRED_FIELDS:
+        if not form_data.get(field):
+            errors.append({"field": field, "message": message})
+
     def check(field: str, validator_result: tuple[bool, str]):
         ok, msg = validator_result
         if not ok:
@@ -110,16 +150,16 @@ def validate_entry_form(form_data: dict) -> list[dict]:
             errors.append({"field": f, "message": "Ha SZÉP-kártya adatot adsz meg, minden SZÉP-kártya mező kötelező"})
 
     # Munkaidő ↔ foglalkozási viszony keresztvalidáció
-    munkaidо = form_data.get("munkaidо_napi_ora")
+    munkaido = form_data.get("munkaido_napi_ora")
     fogl_viszony = form_data.get("foglalkozasi_viszony")
     teljes_munkaidos = {"01", "05", "41"}  # Teljes munkaidős, TM nyugdíjas, TM GYED
-    if munkaidо and fogl_viszony:
-        if str(munkaidо) != "8" and fogl_viszony in teljes_munkaidos:
+    if munkaido and fogl_viszony:
+        if str(munkaido) != "8" and fogl_viszony in teljes_munkaidos:
             errors.append({
                 "field": "foglalkozasi_viszony",
                 "message": "Teljes munkaidős foglalkozási viszony csak 8 órás munkaidőnél választható",
             })
-        if str(munkaidо) == "8" and fogl_viszony not in teljes_munkaidos:
+        if str(munkaido) == "8" and fogl_viszony not in teljes_munkaidos:
             errors.append({
                 "field": "foglalkozasi_viszony",
                 "message": "8 órás munkaidőnél csak teljes munkaidős foglalkozási viszony választható",

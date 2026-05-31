@@ -27,14 +27,10 @@ export const SZEP_KIBOCSATO = [
   { value: "1", label: "K&H Bank" },
 ];
 
-export const MUNKAIDО_OPTIONS = [
-  { value: "1", label: "1 óra" },
+export const MUNKAIDO_OPTIONS = [
   { value: "2", label: "2 óra" },
-  { value: "3", label: "3 óra" },
   { value: "4", label: "4 óra" },
-  { value: "5", label: "5 óra" },
   { value: "6", label: "6 óra" },
-  { value: "7", label: "7 óra" },
   { value: "8", label: "8 óra" },
 ];
 
@@ -88,53 +84,6 @@ export const ORSZAG_OPTIONS = [
   { value: "OTHER", label: "Egyéb" },
 ];
 
-export const REGIO_OPTIONS = [
-  { value: "NYIREGYHAZA", label: "Nyíregyháza" },
-  { value: "DEBRECEN", label: "Debrecen" },
-  { value: "SZEGED", label: "Szeged" },
-  { value: "BUDAPEST", label: "Budapest" },
-  { value: "BEKESCSABA", label: "Békéscsaba" },
-  { value: "PECS", label: "Pécs" },
-  { value: "ZALAEGERSZEG", label: "Zalaegerszeg" },
-  { value: "KECSKEMET", label: "Kecskemét" },
-  { value: "MISKOLC", label: "Miskolc" },
-];
-
-export const EGYSEG_OPTIONS = [
-  { value: "LENOVO", label: "Lenovo" },
-  { value: "GIANT", label: "Giant" },
-  { value: "EGYEB1", label: "Egyéb egység 1 (placeholder)" },
-  { value: "EGYEB2", label: "Egyéb egység 2 (placeholder)" },
-];
-
 export const MUNKAKOR_OPTIONS = [
-  { value: "BERSZ", label: "Bérszámfejtő" },
-  { value: "KOMISSIOZO", label: "Komissiózó" },
-  { value: "RAKODOMUNKÁS", label: "Rakodómunkás" },
-  { value: "TELEPHELYVEZ", label: "Telephelyvezető" },
   { value: "OPERATOR", label: "Operátor" },
-  { value: "QUALITY", label: "Quality inspector" },
-];
-
-export const FEOR_OPTIONS = [
-  { value: "4112", label: "4112 — Irodai alkalmazott" },
-  { value: "4190", label: "4190 — Egyéb irodai foglalkozás" },
-  { value: "7220", label: "7220 — Rakodómunkás" },
-  { value: "7221", label: "7221 — Raktáros" },
-  { value: "7222", label: "7222 — Komissiózó" },
-  { value: "7410", label: "7410 — Gépkezelő" },
-  { value: "7411", label: "7411 — Operátor" },
-  { value: "7412", label: "7412 — Minőségellenőr" },
-  { value: "1319", label: "1319 — Telephelyvezető" },
-  { value: "3411", label: "3411 — Bérszámfejtő" },
-  { value: "9999", label: "9999 — Egyéb (placeholder)" },
-];
-
-export const KOLTSEGHELYAZ_OPTIONS = [
-  { value: "KLBLENU", label: "KLBLENU — Lenovo" },
-  { value: "KLBLENV", label: "KLBLENV — Lenovo V" },
-  { value: "KLBLUM", label: "KLBLUM — Lenovo UM" },
-  { value: "KLBGIANT", label: "KLBGIANT — Giant" },
-  { value: "KLBKONT", label: "KLBKONT — Kontír" },
-  { value: "KLGBDO", label: "KLGBDO — GBD Office" },
 ];

@@ -7,7 +7,7 @@ from datetime import date
 CSV_ENCODING = "cp1250"
 CSV_DELIMITER = ";"
 
-MUNKAIDО_SZABALY = {
+MUNKAIDO_SZABALY = {
     "2": {"col_168": "2",   "col_108": "43.5"},
     "4": {"col_168": "4",   "col_108": "87"},
     "6": {"col_168": "6",   "col_108": "130.5"},
@@ -28,10 +28,10 @@ def _nev(form: dict) -> str:
 
 def generate_nb_torzs(form: dict) -> list[str]:
     jk = _jogviszony_kezdete(form)
-    munkaidо = _val(form, "munkaidо_napi_ora", "8")
-    ora_szabaly = MUNKAIDО_SZABALY.get(munkaidо, MUNKAIDО_SZABALY["8"])
+    munkaido = _val(form, "munkaido_napi_ora", "8")
+    ora_szabaly = MUNKAIDO_SZABALY.get(munkaido, MUNKAIDO_SZABALY["8"])
 
-    row = [""] * 53  # 1-alapú indexelés, 0. hely üres
+    row = [""] * 169  # 1-alapú indexelés, 0. hely üres
 
     row[1]   = _val(form, "elonev")
     row[2]   = _val(form, "vezeteknev")
@@ -170,7 +170,7 @@ def build_csv(header_cols: list[str], rows: list[list[str]]) -> bytes:
 def generate_csvs_for_entry(form_data: dict) -> dict[str, bytes]:
     result = {}
 
-    torzs_header = [str(i) for i in range(1, 53)]
+    torzs_header = [str(i) for i in range(1, 169)]
     result["NBTorzs.csv"] = build_csv(torzs_header, [generate_nb_torzs(form_data)])
 
     juttat_header = [str(i) for i in range(1, 9)]
